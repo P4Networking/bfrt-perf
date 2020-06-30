@@ -21,14 +21,15 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/bocon13/p4rt-go/p4rt"
-	"github.com/golang/protobuf/proto"
-	p4 "github.com/p4lang/p4runtime/proto/p4/v1"
-	"google.golang.org/grpc/codes"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Yi-Tseng/p4r-perf/p4rt"
+	"github.com/golang/protobuf/proto"
+	p4 "github.com/p4lang/p4runtime/go/p4/v1"
+	"google.golang.org/grpc/codes"
 )
 
 var writeReples sync.WaitGroup

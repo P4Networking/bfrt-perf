@@ -22,11 +22,12 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	p4_config_v1 "github.com/p4lang/p4runtime/proto/p4/config/v1"
-	p4 "github.com/p4lang/p4runtime/proto/p4/v1"
-	"github.com/pkg/errors"
 	"io/ioutil"
+
+	"github.com/golang/protobuf/proto"
+	p4_config_v1 "github.com/p4lang/p4runtime/go/p4/config/v1"
+	p4 "github.com/p4lang/p4runtime/go/p4/v1"
+	"github.com/pkg/errors"
 )
 
 type P4DeviceConfig []byte
@@ -78,11 +79,11 @@ func getPipelineConfig(client p4.P4RuntimeClient, deviceId uint64) (*p4.Forwardi
 
 func setPipelineConfig(client p4.P4RuntimeClient, deviceId uint64, electionId *p4.Uint128, config *p4.ForwardingPipelineConfig) error {
 	req := &p4.SetForwardingPipelineConfigRequest{
-		DeviceId: deviceId,
-		RoleId:   0, // not used
+		DeviceId:   deviceId,
+		RoleId:     0, // not used
 		ElectionId: electionId,
-		Action: p4.SetForwardingPipelineConfigRequest_VERIFY_AND_COMMIT,
-		Config: config,
+		Action:     p4.SetForwardingPipelineConfigRequest_VERIFY_AND_COMMIT,
+		Config:     config,
 	}
 	_, err := client.SetForwardingPipelineConfig(context.Background(), req)
 	// ignore the response; it is an empty message
