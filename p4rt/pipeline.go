@@ -8,29 +8,15 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/binary"
-	"fmt"
-	"io/ioutil"
 
-	"github.com/golang/protobuf/proto"
-	p4_config_v1 "github.com/p4lang/p4runtime/go/p4/config/v1"
+	p4_config "github.com/p4lang/p4runtime/go/p4/config/v1"
 	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	"github.com/pkg/errors"
 )
 
 type P4DeviceConfig []byte
 
-func LoadP4Info(p4infoPath string) (p4info p4_config_v1.P4Info, err error) {
-	fmt.Printf("P4 Info: %s\n", p4infoPath)
-
-	p4infoBytes, err := ioutil.ReadFile(p4infoPath)
-	if err != nil {
-		return
-	}
-	err = proto.UnmarshalText(string(p4infoBytes), &p4info)
-	return
-}
-
-func BuildPipelineConfig(p4info p4_config_v1.P4Info, deviceConfigPath string) (config p4.ForwardingPipelineConfig, err error) {
+func BuildPipelineConfig(p4info p4_config.P4Info, deviceConfigPath string) (config p4.ForwardingPipelineConfig, err error) {
 	deviceConfig, err := LoadDeviceConfig(deviceConfigPath)
 	if err != nil {
 		return
@@ -106,7 +92,7 @@ func matches(target, actual *p4.ForwardingPipelineConfig) bool {
 	return proto.Equal(target.P4Info, actual.P4Info)
 }
 
-func UpdatePipelineConfig(client p4.P4RuntimeClient, p4Info *p4_config_v1.P4Info,
+func UpdatePipelineConfig(client p4.P4RuntimeClient, p4Info *p4_config.P4Info,
 	config PipelineConfig, deviceId uint64, forcePush bool) (bool, error) {
 	configData, err := config.Get()
 	if err != nil {

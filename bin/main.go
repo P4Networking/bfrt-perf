@@ -21,12 +21,13 @@ import (
 
 var writeReples sync.WaitGroup
 var failedWrites uint32
+var p4infoHelper p4rt.P4InfoHelper
 
 func main() {
 
 	target := flag.String("target", "localhost:28000", "")
 	verbose := flag.Bool("verbose", false, "")
-	p4info := flag.String("p4info", "", "")
+	p4infoPath := flag.String("p4info", "", "")
 	count := flag.Uint64("count", 1, "")
 	deviceConfig := flag.String("deviceConfig", "", "")
 
@@ -42,7 +43,12 @@ func main() {
 		panic(err)
 	}
 
-	err = client.SetForwardingPipelineConfig(*p4info, *deviceConfig)
+	err = client.SetForwardingPipelineConfig(*p4infoPath, *deviceConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	err = p4infoHelper.Init(*p4infoPath)
 	if err != nil {
 		panic(err)
 	}
@@ -97,14 +103,24 @@ func SendTableEntries(p4rt p4rt.P4RuntimeClient, count uint64) {
 		},
 	}
 
+	routeV4TableID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.routing_v4")
+	if err != nil {
+		panic(err)
+	}
+
+	setNextActionID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.set_next_id_routing_v4")
+	if err != nil {
+		panic(err)
+	}
+
 	update := &p4.Update{
 		Type: p4.Update_INSERT,
 		Entity: &p4.Entity{Entity: &p4.Entity_TableEntry{
 			TableEntry: &p4.TableEntry{
-				TableId: 33562650, // FabricIngress.forwarding.routing_v4
+				TableId: routeV4TableID, // FabricIngress.forwarding.routing_v4
 				Match:   match,
 				Action: &p4.TableAction{Type: &p4.TableAction_Action{Action: &p4.Action{
-					ActionId: 16777434, // set_next_id_routing_v4
+					ActionId: setNextActionID, // set_next_id_routing_v4
 					Params: []*p4.Action_Param{
 						{
 							ParamId: 1,              // next_id
