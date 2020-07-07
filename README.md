@@ -6,23 +6,13 @@ Client library and flow write performance tester
 *Install Go* (>= 1.13.3)
 https://golang.org/doc/install
 
-*Install Protoc* (>= 3.2.0)
-You only need the C++ version
-https://developers.google.com/protocol-buffers/
-
-`export GOPATH=~/go` (if you changed it)
+## Building binaries
 
 ```
-bash <(curl -s https://raw.githubusercontent.com/bocon13/p4rt-go/master/setup.sh)
+make
 ```
 
-## Building for BMv2
-
-Build the test binary
-```
-cd $HOME/go/src/github.com/bocon13/p4rt-go/
-go build -tags bmv2 -o p4rt_test_bmv2 bin/main.go
-```
+## Test with bmv2(stratum_bmv2)
 
 Run Stratum BMv2:
 ```
@@ -39,20 +29,15 @@ Then, you can run the test:
  -verbose
 ```
 
-<img src="https://github.com/bocon13/p4rt-go/raw/master/test_bmv2.gif" width="688px" height="342px" />
+<img src="https://github.com/Yi-Tseng/p4r-perf/raw/master/test_bmv2.gif" width="688px" height="342px" />
 
-## Building for Tofino
-
-Build the test binary
-```
-GOOS=linux go build -tags tofino -o p4rt_test_tofino bin/main.go
-```
+# Test with Tofino device
 
 Start Stratum on your Tofino switch
 
 Then, you can run the test:
 ```
-./p4rt_test_tofino \
+./p4rt_test_stratum_bf \
  -target localhost:28000 \
  -p4info test/montara/p4info.txt \
  -deviceConfig test/montara/tofino.bin,test/montara/context.json \
@@ -61,7 +46,7 @@ Then, you can run the test:
 ```
 
 Notes:
-- If you use the test files, they were compiled against SDE 9.0.0
+- If you use the test files, they were compiled against SDE 9.2.0
 - Remember to update the target string to match the IP of your switch (or run the test on the box)
 - Update GOOS to match the operating system of where you will run the test binary
 - You can use any P4 program/compiler version that you want, just be sure to update the paths
