@@ -87,32 +87,28 @@ func main() {
 	fmt.Printf("Number of failed writes: %d\n", failedWrites)
 }
 
+// SendTableEntries writes multiple table entries to the routing_v4
+// table.
 func SendTableEntries(p4rt p4rt.P4RuntimeClient, count uint64) {
 	match := []*p4.FieldMatch{
 		{
-			FieldId:        1, // mpls_label
-			FieldMatchType: &p4.FieldMatch_Exact_{&p4.FieldMatch_Exact{}},
+			FieldId:        1, // ipv4_dst
+			FieldMatchType: &p4.FieldMatch_Lpm{&p4.FieldMatch_LPM{}},
 		},
-		// more fields...
-		//{
-		//	FieldId:        0,
-		//	FieldMatchType: &p4.FieldMatch_Exact_{
-		//		Exact: &p4.FieldMatch_Exact{[]byte{4, 5, 6, 7}}},
-		//},
 	}
 
 	update := &p4.Update{
 		Type: p4.Update_INSERT,
 		Entity: &p4.Entity{Entity: &p4.Entity_TableEntry{
 			TableEntry: &p4.TableEntry{
-				TableId: 33574274, // FabricIngress.forwarding.mpls
+				TableId: 33562650, // FabricIngress.forwarding.routing_v4
 				Match:   match,
 				Action: &p4.TableAction{Type: &p4.TableAction_Action{Action: &p4.Action{
-					ActionId: 16827758, // pop_mpls_and_next
+					ActionId: 16777434, // set_next_id_routing_v4
 					Params: []*p4.Action_Param{
 						{
 							ParamId: 1,              // next_id
-							Value:   Uint64(0)[0:4], // 32 bits
+							Value:   Uint64(1)[4:8], // 32 bits
 						},
 					},
 				}}},
@@ -121,9 +117,9 @@ func SendTableEntries(p4rt p4rt.P4RuntimeClient, count uint64) {
 	}
 
 	for i := uint64(0); i < count; i++ {
-		//update.GetEntity().GetTableEntry().GetMatch()[0].FieldId = uint32(i % 2)
-		matchField := update.GetEntity().GetTableEntry().GetMatch()[0].GetExact()
-		matchField.Value = Uint64(i)[5:8] // mpls_label is 20 bits
+		matchField := update.GetEntity().GetTableEntry().GetMatch()[0].GetLpm()
+		matchField.Value = Uint64(i)[4:8] // ipv4 is 32 bits
+		matchField.PrefixLen = 32
 		res := p4rt.Write(update)
 		go CountFailed(proto.Clone(update).(*p4.Update), res)
 	}
