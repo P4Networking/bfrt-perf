@@ -1,4 +1,4 @@
-// +build stratum-bf
+// +build stratum_bf
 // Copyright 2020-present Brian O'Connor
 // Copyright 2020-present Open Networking Foundation
 // SPDX-License-Identifier: Apache-2.0

@@ -8,13 +8,13 @@ ifndef TARGET
 endif
 
 build: check_env_
-	go build -tags "$(TARGET)" -o p4rt-test-$(TARGET) ./bin/main.go
+	go build -tags "$(TARGET)" -o p4rt_test_$(TARGET) ./bin/main.go
 
 bmv2:
 	TARGET="bmv2" $(MAKE) build
 
 stratum_bf:
-	TARGET="stratum-bf" $(MAKE) build
+	TARGET="stratum_bf" $(MAKE) build
 
 stratum_bfrt:
-	TARGET="stratum-bfrt" $(MAKE) build
+	TARGET="stratum_bfrt" $(MAKE) build

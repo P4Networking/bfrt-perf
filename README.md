@@ -21,7 +21,7 @@ docker run --privileged --rm -it -p 50001:50001 opennetworking/mn-stratum
 
 Then, you can run the test:
 ```
-./p4rt-test-bmv2 \
+./p4rt_test_bmv2 \
  -target localhost:50001 \
  -p4info test/bmv2/p4info.txt \
  -deviceConfig test/bmv2/bmv2.json \
@@ -35,12 +35,22 @@ Then, you can run the test:
 
 Start Stratum on your Tofino switch
 
-Then, you can run the test:
+Then, you can run the test if you are using stratum_bf:
 ```
-./p4rt-test-stratum-bf \
+./p4rt_test_stratum_bf \
+ -target localhost:28000 \
+ -p4info p4info.txt \
+ -deviceConfig tofino.bin,context.json \
+ -count 1000 \
+ -verbose
+```
+
+Or, using the following command if you are using the stratum_bfrt:
+```
+./p4rt_test_stratum_bfrt \
  -target localhost:28000 \
  -p4info test/montara/p4info.txt \
- -deviceConfig test/montara/tofino.bin,test/montara/context.json \
+ -deviceConfig path/to/device/config \
  -count 1000 \
  -verbose
 ```

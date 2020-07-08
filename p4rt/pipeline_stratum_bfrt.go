@@ -1,4 +1,4 @@
-// +build stratum-bfrt
+// +build stratum_bfrt
 // Copyright 2020-present Brian O'Connor
 // Copyright 2020-present Open Networking Foundation
 // SPDX-License-Identifier: Apache-2.0
@@ -29,8 +29,8 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	bin := make([]byte, binLen)
 
 	if bytesRead, err := deviceConfigBin.Read(bin); err != nil {
-		return nil, fmt.Errorf("read %s: %v", tofinoBinPath, err)
-	} else if bytesRead != int(tofinoBinInfo.Size()) {
+		return nil, fmt.Errorf("read %s: %v", deviceConfigPath, err)
+	} else if bytesRead != int(deviceConfigBinInfo.Size()) {
 		return nil, errors.New("tofino bin copy failed")
 	}
 

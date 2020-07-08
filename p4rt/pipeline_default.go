@@ -1,4 +1,4 @@
-// +build !bmv2,!stratum-bf,!stratum-bfrt
+// +build !bmv2,!stratum_bf,!stratum_bfrt
 // Copyright 2020-present Brian O'Connor
 // Copyright 2020-present Open Networking Foundation
 // SPDX-License-Identifier: Apache-2.0
