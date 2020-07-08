@@ -89,9 +89,10 @@ func CreateOrGetP4RuntimeClient(host string, deviceId uint64, batchSize int, num
 		return nil, err
 	}
 	client := &p4rtClient{
-		client:    p4.NewP4RuntimeClient(conn),
-		deviceId:  deviceId,
-		batchSize: batchSize,
+		client:     p4.NewP4RuntimeClient(conn),
+		deviceId:   deviceId,
+		batchSize:  batchSize,
+		numThreads: numThreads,
 	}
 	err = client.Init()
 	if err != nil {
