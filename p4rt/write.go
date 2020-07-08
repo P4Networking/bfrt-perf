@@ -16,10 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var MAX_BATCH_SIZE = 200
-var NUM_PARALLEL_WRITERS = 1
-var WRITE_BUFFER_SIZE = MAX_BATCH_SIZE * NUM_PARALLEL_WRITERS * 10
-
 type p4Write struct {
 	update   *p4.Update
 	response chan *p4.Error
@@ -46,11 +42,11 @@ func (c *p4rtClient) SetWriteTraceChan(traceChan chan WriteTrace) {
 
 func (c *p4rtClient) ListenForWrites() {
 	for {
-		writes := make([]p4Write, MAX_BATCH_SIZE)
+		writes := make([]p4Write, c.batchSize)
 		var currBatchSize int
 		writes[0] = <-c.writes // wait for the first write in the batch
 	batch: // read as much as we can from the write channel into the batch
-		for currBatchSize = 1; currBatchSize < MAX_BATCH_SIZE; currBatchSize++ {
+		for currBatchSize = 1; currBatchSize < c.batchSize; currBatchSize++ {
 			select {
 			case write := <-c.writes:
 				writes[currBatchSize] = write

@@ -30,10 +30,12 @@ func main() {
 	p4infoPath := flag.String("p4info", "", "")
 	count := flag.Uint64("count", 1, "")
 	deviceConfig := flag.String("deviceConfig", "", "")
+	batchSize := flag.Int("batchSize", 100, "Number of table entries per batch.")
+	numThreads := flag.Int("numThreads", 1, "Number of threads to send write request.")
 
 	flag.Parse()
 
-	client, err := p4rt.GetP4RuntimeClient(*target, 1)
+	client, err := p4rt.CreateOrGetP4RuntimeClient(*target, 1, *batchSize, *numThreads)
 	if err != nil {
 		panic(err)
 	}

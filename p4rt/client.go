@@ -34,6 +34,8 @@ type p4rtClient struct {
 	electionId     p4.Uint128
 	writes         chan p4Write
 	writeTraceChan chan WriteTrace
+	batchSize      int
+	numThreads     int
 }
 
 func (c *p4rtClient) Init() (err error) {
@@ -60,16 +62,17 @@ func (c *p4rtClient) Init() (err error) {
 		}
 	}()
 
+	var writeBufferSize = c.batchSize * c.numThreads * 10
 	// Initialize Write thread
-	c.writes = make(chan p4Write, WRITE_BUFFER_SIZE)
-	for i := 0; i < NUM_PARALLEL_WRITERS; i++ {
+	c.writes = make(chan p4Write, writeBufferSize)
+	for i := 0; i < c.numThreads; i++ {
 		go c.ListenForWrites()
 	}
 
 	return
 }
 
-func GetP4RuntimeClient(host string, deviceId uint64) (P4RuntimeClient, error) {
+func CreateOrGetP4RuntimeClient(host string, deviceId uint64, batchSize int, numThreads int) (P4RuntimeClient, error) {
 	key := p4rtClientKey{
 		host:     host,
 		deviceId: deviceId,
@@ -86,8 +89,9 @@ func GetP4RuntimeClient(host string, deviceId uint64) (P4RuntimeClient, error) {
 		return nil, err
 	}
 	client := &p4rtClient{
-		client:   p4.NewP4RuntimeClient(conn),
-		deviceId: deviceId,
+		client:    p4.NewP4RuntimeClient(conn),
+		deviceId:  deviceId,
+		batchSize: batchSize,
 	}
 	err = client.Init()
 	if err != nil {
