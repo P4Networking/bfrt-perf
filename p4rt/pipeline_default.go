@@ -15,3 +15,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 	return nil, errors.New("No target type specified at build time. " +
 		"You need to rebuild with \"-tags\"")
 }
+
+func TestTarget() string {
+	return "default"
+}

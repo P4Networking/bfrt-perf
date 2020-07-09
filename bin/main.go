@@ -89,7 +89,7 @@ func main() {
 	writeReples.Wait()
 	fmt.Printf("Number of failed writes: %d\n", failedWrites)
 
-	fileName := fmt.Sprintf("test-result-%d.csv", time.Now().Unix())
+	fileName := fmt.Sprintf("test-result-%s-%d-%d-%d.csv", p4rt.TestTarget(), *batchSize, *iterations, time.Now().Unix())
 	fmt.Printf("Saving results to %s\n", fileName)
 
 	csvFile, err := os.Create(fileName)

@@ -36,3 +36,7 @@ func LoadDeviceConfig(deviceConfigPath string) (P4DeviceConfig, error) {
 
 	return bin, nil
 }
+
+func TestTarget() string {
+	return "stratum-bfrt"
+}
