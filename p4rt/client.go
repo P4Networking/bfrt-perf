@@ -15,23 +15,25 @@ import (
 var p4rtClients = make(map[p4rtClientKey]P4RuntimeClient)
 
 type P4RuntimeClient interface {
-	SetMastership(electionId p4.Uint128) error
+	SetMastership(electionID p4.Uint128) error
 	GetForwardingPipelineConfig() (*p4.ForwardingPipelineConfig, error)
 	SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath string) error
-	Write(update *p4.Update) <-chan *p4.Error
+	Write(req *p4.WriteRequest) <-chan []*p4.Error
 	SetWriteTraceChan(traceChan chan WriteTrace)
+	DeviceID() uint64
+	ElectionID() *p4.Uint128
 }
 
 type p4rtClientKey struct {
 	host     string
-	deviceId uint64
+	deviceID uint64
 }
 
 type p4rtClient struct {
 	client         p4.P4RuntimeClient
 	stream         p4.P4Runtime_StreamChannelClient
-	deviceId       uint64
-	electionId     p4.Uint128
+	deviceID       uint64
+	electionID     p4.Uint128
 	writes         chan p4Write
 	writeTraceChan chan WriteTrace
 	batchSize      int
@@ -72,10 +74,18 @@ func (c *p4rtClient) Init() (err error) {
 	return
 }
 
-func CreateOrGetP4RuntimeClient(host string, deviceId uint64, batchSize int, numThreads int) (P4RuntimeClient, error) {
+func (c *p4rtClient) DeviceID() uint64 {
+	return c.deviceID
+}
+
+func (c *p4rtClient) ElectionID() *p4.Uint128 {
+	return &c.electionID
+}
+
+func CreateOrGetP4RuntimeClient(host string, deviceID uint64, batchSize int, numThreads int) (P4RuntimeClient, error) {
 	key := p4rtClientKey{
 		host:     host,
-		deviceId: deviceId,
+		deviceID: deviceID,
 	}
 
 	// First, return a P4RT client if one exists
@@ -90,7 +100,7 @@ func CreateOrGetP4RuntimeClient(host string, deviceId uint64, batchSize int, num
 	}
 	client := &p4rtClient{
 		client:     p4.NewP4RuntimeClient(conn),
-		deviceId:   deviceId,
+		deviceID:   deviceID,
 		batchSize:  batchSize,
 		numThreads: numThreads,
 	}

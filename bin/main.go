@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"os"
@@ -26,9 +27,8 @@ var p4infoHelper p4rt.P4InfoHelper
 func main() {
 
 	target := flag.String("target", "localhost:28000", "")
-	verbose := flag.Bool("verbose", false, "")
 	p4infoPath := flag.String("p4info", "", "")
-	count := flag.Uint64("count", 1, "")
+	iterations := flag.Int("iterations", 1, "total iterations to run")
 	deviceConfig := flag.String("deviceConfig", "", "")
 	batchSize := flag.Int("batchSize", 100, "Number of table entries per batch.")
 	numThreads := flag.Int("numThreads", 1, "Number of threads to send write request.")
@@ -56,98 +56,124 @@ func main() {
 	}
 
 	// Set up write tracing for test
-	writeTraceChan := make(chan p4rt.WriteTrace, 100)
+	writeTraceChan := make(chan p4rt.WriteTrace, 1000)
 	client.SetWriteTraceChan(writeTraceChan)
-	doneChan := make(chan bool)
+	doneChan := make(chan []time.Duration)
 	go func() {
-		var writeCount, lastCount uint64
-		printInterval := 1 * time.Second
-		ticker := time.Tick(printInterval)
+		var currentIteration int
+		durations := make([]time.Duration, *iterations)
 		for {
 			select {
 			case trace := <-writeTraceChan:
-				writeCount += uint64(trace.BatchSize)
-				if writeCount >= *count {
-					doneChan <- true
+				durations[currentIteration] = trace.Duration
+				currentIteration++
+				if currentIteration == *iterations {
+					doneChan <- durations
 					return
-				}
-			case <-ticker:
-				if *verbose {
-					fmt.Printf("\033[2K\rWrote %d of %d (~%.1f flows/sec)...",
-						writeCount, *count, float64(writeCount-lastCount)/printInterval.Seconds())
-					lastCount = writeCount
+				} else if currentIteration > *iterations {
+					// Should not happened
+					panic(fmt.Errorf("Current iteration %d is greater than target iteration number %d", currentIteration, *iterations))
 				}
 			}
 		}
 	}()
 
 	// Send the flow entries
-	writeReples.Add(int(*count))
-	start := time.Now()
-	SendTableEntries(client, *count)
+	writeReples.Add(int(*iterations))
+	SendTableEntries(client, *iterations, *batchSize)
 
 	// Wait for all writes to finish
-	<-doneChan
-	duration := time.Since(start).Seconds()
-	fmt.Printf("\033[2K\r%f seconds, %d writes, %f writes/sec\n",
-		duration, *count, float64(*count)/duration)
+	durations := <-doneChan
+
 	writeReples.Wait()
 	fmt.Printf("Number of failed writes: %d\n", failedWrites)
+
+	csvFile, err := os.Create("result.csv")
+	defer csvFile.Close()
+	if err != nil {
+		panic(err)
+	}
+	resultWriter := csv.NewWriter(csvFile)
+
+	for i, d := range durations {
+		data := []string{string(i), string(d.Microseconds())}
+		resultWriter.Write(data)
+	}
+	resultWriter.Flush()
 }
 
 // SendTableEntries writes multiple table entries to the routing_v4
 // table.
-func SendTableEntries(p4rt p4rt.P4RuntimeClient, count uint64) {
-	match := []*p4.FieldMatch{
-		{
-			FieldId:        1, // ipv4_dst
-			FieldMatchType: &p4.FieldMatch_Lpm{&p4.FieldMatch_LPM{}},
-		},
-	}
+func SendTableEntries(client p4rt.P4RuntimeClient, iterations int, batchSize int) {
 
-	routeV4TableID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.routing_v4")
-	if err != nil {
-		panic(err)
-	}
+	// Prepare write requests for all iterations
+	requests := make([]*p4.WriteRequest, iterations)
+	for i := 0; i < iterations; i++ {
+		tableID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.routing_v4")
+		if err != nil {
+			panic(err)
+		}
 
-	setNextActionID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.set_next_id_routing_v4")
-	if err != nil {
-		panic(err)
-	}
+		actionID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.set_next_id_routing_v4")
+		if err != nil {
+			panic(err)
+		}
 
-	update := &p4.Update{
-		Type: p4.Update_INSERT,
-		Entity: &p4.Entity{Entity: &p4.Entity_TableEntry{
-			TableEntry: &p4.TableEntry{
-				TableId: routeV4TableID, // FabricIngress.forwarding.routing_v4
-				Match:   match,
-				Action: &p4.TableAction{Type: &p4.TableAction_Action{Action: &p4.Action{
-					ActionId: setNextActionID, // set_next_id_routing_v4
-					Params: []*p4.Action_Param{
-						{
-							ParamId: 1,              // next_id
-							Value:   Uint64(1)[4:8], // 32 bits
+		updates := make([]*p4.Update, batchSize)
+		for j := 0; j < batchSize; j++ {
+			match := []*p4.FieldMatch{
+				{
+					FieldId: 1, // ipv4_dst
+					FieldMatchType: &p4.FieldMatch_Lpm{
+						&p4.FieldMatch_LPM{
+							Value:     Uint64(uint64(i*batchSize + j))[4:8],
+							PrefixLen: 32,
 						},
 					},
-				}}},
-			},
-		}},
+				},
+			}
+
+			updates[j] = &p4.Update{
+				Type: p4.Update_INSERT,
+				Entity: &p4.Entity{Entity: &p4.Entity_TableEntry{
+					TableEntry: &p4.TableEntry{
+						TableId: tableID, // FabricIngress.forwarding.routing_v4
+						Match:   match,
+						Action: &p4.TableAction{Type: &p4.TableAction_Action{Action: &p4.Action{
+							ActionId: actionID, // set_next_id_routing_v4
+							Params: []*p4.Action_Param{
+								{
+									ParamId: 1,              // next_id
+									Value:   Uint64(1)[4:8], // 32 bits
+								},
+							},
+						}}},
+					},
+				}},
+			}
+		}
+		req := &p4.WriteRequest{
+			DeviceId:   client.DeviceID(),
+			ElectionId: client.ElectionID(),
+			Updates:    updates,
+		}
+		requests[i] = req
 	}
 
-	for i := uint64(0); i < count; i++ {
-		matchField := update.GetEntity().GetTableEntry().GetMatch()[0].GetLpm()
-		matchField.Value = Uint64(i)[4:8] // ipv4 is 32 bits
-		matchField.PrefixLen = 32
-		res := p4rt.Write(update)
-		go CountFailed(proto.Clone(update).(*p4.Update), res)
+	for _, req := range requests {
+		res := client.Write(req)
+		go CountFailed(proto.Clone(req).(*p4.WriteRequest), res)
 	}
 }
 
-func CountFailed(update *p4.Update, res <-chan *p4.Error) {
-	err := <-res
-	if err.CanonicalCode != int32(codes.OK) { // write failed
-		atomic.AddUint32(&failedWrites, 1)
-		fmt.Fprintf(os.Stderr, "%v -> %v\n", update, err.GetMessage())
+func CountFailed(write *p4.WriteRequest, res <-chan []*p4.Error) {
+	errors := <-res
+	for i, err := range errors {
+		update := write.Updates[i]
+		if err.CanonicalCode != int32(codes.OK) { // write failed
+			atomic.AddUint32(&failedWrites, 1)
+			fmt.Fprintf(os.Stderr, "%v -> %v\n", update, err.GetMessage())
+		}
 	}
 	writeReples.Done()
 }

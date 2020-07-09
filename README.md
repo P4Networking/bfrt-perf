@@ -25,7 +25,7 @@ Then, you can run the test:
  -target localhost:50001 \
  -p4info test/bmv2/p4info.txt \
  -deviceConfig test/bmv2/bmv2.json \
- -count 1000 \
+ -iterations 1000 \
  -batchSize 100 \
  -numThreads 1 \
  -verbose
@@ -43,7 +43,7 @@ Then, you can run the test if you are using stratum_bf:
  -target localhost:28000 \
  -p4info p4info.txt \
  -deviceConfig tofino.bin,context.json \
- -count 1000 \
+ -iterations 1000 \
  -batchSize 100 \
  -numThreads 1 \
  -verbose
@@ -55,7 +55,7 @@ Or, using the following command if you are using the stratum_bfrt:
  -target localhost:28000 \
  -p4info test/montara/p4info.txt \
  -deviceConfig path/to/device/config \
- -count 1000 \
+ -iterations 1000 \
  -batchSize 100 \
  -numThreads 1 \
  -verbose

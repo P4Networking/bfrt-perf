@@ -17,8 +17,8 @@ import (
 )
 
 type p4Write struct {
-	update   *p4.Update
-	response chan *p4.Error
+	req  *p4.WriteRequest
+	resp chan []*p4.Error
 }
 
 type WriteTrace struct {
@@ -27,11 +27,11 @@ type WriteTrace struct {
 	Errors    []*p4.Error
 }
 
-func (c *p4rtClient) Write(update *p4.Update) <-chan *p4.Error {
-	res := make(chan *p4.Error, 1)
+func (c *p4rtClient) Write(req *p4.WriteRequest) <-chan []*p4.Error {
+	res := make(chan []*p4.Error, c.batchSize)
 	c.writes <- p4Write{
-		update:   proto.Clone(update).(*p4.Update),
-		response: res,
+		req:  proto.Clone(req).(*p4.WriteRequest),
+		resp: res,
 	}
 	return res
 }
@@ -42,44 +42,21 @@ func (c *p4rtClient) SetWriteTraceChan(traceChan chan WriteTrace) {
 
 func (c *p4rtClient) ListenForWrites() {
 	for {
-		writes := make([]p4Write, c.batchSize)
-		var currBatchSize int
-		writes[0] = <-c.writes // wait for the first write in the batch
-	batch: // read as much as we can from the write channel into the batch
-		for currBatchSize = 1; currBatchSize < c.batchSize; currBatchSize++ {
-			select {
-			case write := <-c.writes:
-				writes[currBatchSize] = write
-			default: // no write update is immediately available
-				break batch
-			}
-		}
-
-		// Build the batch write request
-		updates := make([]*p4.Update, currBatchSize)
-		for i := range updates {
-			updates[i] = writes[i].update
-		}
-		req := &p4.WriteRequest{
-			DeviceId:   c.deviceId,
-			ElectionId: &c.electionId,
-			Updates:    updates,
-		}
+		write := <-c.writes // wait for the first write in the batch
+		req := write.req
 		// Write the request
 		start := time.Now()
 		_, err := c.client.Write(context.Background(), req)
 		// ignore the write response; it is an empty message (details, if any, are in err)
-		go processWriteResponse(writes, err, currBatchSize, start, c.writeTraceChan)
+		go processWriteResponse(write, err, c.batchSize, start, c.writeTraceChan)
 	}
 }
 
-func processWriteResponse(writes []p4Write, err error, batchSize int, start time.Time, traceChan chan WriteTrace) {
+func processWriteResponse(write p4Write, err error, batchSize int, start time.Time, traceChan chan WriteTrace) {
 	duration := time.Since(start)
-	errors := ParseP4RuntimeWriteError(err, batchSize)
+	errors := parseP4RuntimeWriteError(err, batchSize)
 	// Send p4.Errors to waiting channels
-	for i := range errors {
-		writes[i].response <- errors[i]
-	}
+	write.resp <- errors
 
 	if traceChan != nil {
 		trace := WriteTrace{
@@ -93,10 +70,9 @@ func processWriteResponse(writes []p4Write, err error, batchSize int, start time
 			fmt.Println("Write trace channel full. Discarding trace")
 		}
 	}
-
 }
 
-func ParseP4RuntimeWriteError(err error, batchSize int) []*p4.Error {
+func parseP4RuntimeWriteError(err error, batchSize int) []*p4.Error {
 	errors := make([]*p4.Error, batchSize)
 	var code int32
 	var message = ""

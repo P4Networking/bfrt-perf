@@ -72,7 +72,7 @@ func (c *p4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 	if err != nil {
 		return
 	}
-	err = setPipelineConfig(c.client, c.deviceId, &c.electionId, &pipeline)
+	err = setPipelineConfig(c.client, c.deviceID, &c.electionID, &pipeline)
 	if err != nil {
 		return
 	}
@@ -80,7 +80,7 @@ func (c *p4rtClient) SetForwardingPipelineConfig(p4InfoPath, deviceConfigPath st
 }
 
 func (c *p4rtClient) GetForwardingPipelineConfig() (*p4.ForwardingPipelineConfig, error) {
-	return getPipelineConfig(c.client, c.deviceId)
+	return getPipelineConfig(c.client, c.deviceID)
 }
 
 /* FIXME(bocon)
