@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -88,7 +89,10 @@ func main() {
 	writeReples.Wait()
 	fmt.Printf("Number of failed writes: %d\n", failedWrites)
 
-	csvFile, err := os.Create("result.csv")
+	fileName := fmt.Sprintf("test-result-%d.csv", time.Now().Unix())
+	fmt.Printf("Saving results to %s\n", fileName)
+
+	csvFile, err := os.Create(fileName)
 	defer csvFile.Close()
 	if err != nil {
 		panic(err)
@@ -96,7 +100,7 @@ func main() {
 	resultWriter := csv.NewWriter(csvFile)
 
 	for i, d := range durations {
-		data := []string{string(i), string(d.Microseconds())}
+		data := []string{strconv.Itoa(i), strconv.FormatInt(d.Microseconds(), 10)}
 		resultWriter.Write(data)
 	}
 	resultWriter.Flush()
