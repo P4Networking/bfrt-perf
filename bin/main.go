@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/breezestars/bfrt-perf/bfrt"
-	p4 "github.com/breezestars/go-bfrt/proto/out"
+	"github.com/breezestars/bfruntime/go/p4"
 	f "github.com/breezestars/go-bfrt/util/enums"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/codes"

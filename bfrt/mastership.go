@@ -6,7 +6,7 @@
 package bfrt
 
 import (
-	p4 "github.com/breezestars/go-bfrt/proto/out"
+	"github.com/breezestars/bfruntime/go/p4"
 )
 
 func (c *bfrtClient) SetMastership(clientId uint32) (err error) {

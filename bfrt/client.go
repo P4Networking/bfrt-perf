@@ -8,7 +8,7 @@ package bfrt
 import (
 	"context"
 	"fmt"
-	p4 "github.com/breezestars/go-bfrt/proto/out"
+	"github.com/breezestars/bfruntime/go/p4"
 )
 
 var bfrtClients = make(map[bfrtClientKey]BFRuntimeClient)

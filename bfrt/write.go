@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	p4 "github.com/breezestars/go-bfrt/proto/out"
+	"github.com/breezestars/bfruntime/go/p4"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc/codes"
