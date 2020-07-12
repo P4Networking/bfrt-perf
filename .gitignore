@@ -1,3 +1,5 @@
 p4rt_test*
 main
 .vscode
+.idea
+bfrt_test*

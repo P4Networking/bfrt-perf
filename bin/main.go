@@ -1,6 +1,7 @@
 // Copyright 2020-present Brian O'Connor
 // Copyright 2020-present Open Networking Foundation
 // SPDX-License-Identifier: Apache-2.0
+// Modifications copyright (C) 2020 Chun-Ming Ou
 
 package main
 
@@ -9,87 +10,113 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"github.com/breezestars/go-bfrt/util"
+	"net"
 	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/Yi-Tseng/p4r-perf/p4rt"
+	"github.com/breezestars/bfrt-perf/bfrt"
+	p4 "github.com/breezestars/go-bfrt/proto/out"
+	f "github.com/breezestars/go-bfrt/util/enums"
 	"github.com/golang/protobuf/proto"
-	p4 "github.com/p4lang/p4runtime/go/p4/v1"
 	"google.golang.org/grpc/codes"
 )
 
 var writeReples sync.WaitGroup
 var failedWrites uint32
-var p4infoHelper p4rt.P4InfoHelper
+var p4infoHelper bfrt.P4InfoHelper
+
+var (
+	target     string
+	iterations int
+	batchSize  int
+	numThreads int
+	p4Name     string
+
+	clientId uint32 = 0
+	deviceId uint32 = 0
+)
+
+func init() {
+	flag.StringVar(&target, "target", ":50052", "BFRuntime `<Server IP>:<Server Port>`. By default, :50052")
+	flag.IntVar(&iterations, "iterations", 1, "Total iterations to run")
+	flag.IntVar(&batchSize, "batchSize", 100, "Number of table entries per batch")
+	flag.IntVar(&numThreads, "numThreads", 1, "Number of threads to send write request")
+	flag.StringVar(&p4Name, "p4Name", "", "Name of p4 program")
+	flag.Parse()
+}
 
 func main() {
-
-	target := flag.String("target", "localhost:28000", "")
-	p4infoPath := flag.String("p4info", "", "")
-	iterations := flag.Int("iterations", 1, "total iterations to run")
-	deviceConfig := flag.String("deviceConfig", "", "")
-	batchSize := flag.Int("batchSize", 100, "Number of table entries per batch.")
-	numThreads := flag.Int("numThreads", 1, "Number of threads to send write request.")
-
-	flag.Parse()
-
-	client, err := p4rt.CreateOrGetP4RuntimeClient(*target, 1, *batchSize, *numThreads)
+	client, err := bfrt.CreateOrGetBFRuntimeClient(target, deviceId, batchSize, numThreads, p4Name)
 	if err != nil {
 		panic(err)
 	}
 
-	err = client.SetMastership(p4.Uint128{High: 0, Low: 1})
+	err = client.SetMastership(clientId)
 	if err != nil {
 		panic(err)
 	}
 
-	err = client.SetForwardingPipelineConfig(*p4infoPath, *deviceConfig)
+	time.Sleep(1 * time.Second)
+
+	err = client.SetForwardingPipelineConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	err = p4infoHelper.Init(*p4infoPath)
+	bfrtConfig, err := client.GetForwardingPipelineConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	err = p4infoHelper.Init(bfrtConfig[0].BfruntimeInfo)
 	if err != nil {
 		panic(err)
 	}
 
 	// Set up write tracing for test
-	writeTraceChan := make(chan p4rt.WriteTrace, 1000)
+	writeTraceChan := make(chan bfrt.WriteTrace, 1000)
 	client.SetWriteTraceChan(writeTraceChan)
 	doneChan := make(chan []time.Duration)
 	go func() {
-		var currentIteration int
-		durations := make([]time.Duration, *iterations)
+		var currentIteration, lastCount int
+		printInterval := 1 * time.Second
+		ticker := time.Tick(printInterval)
+		durations := make([]time.Duration, iterations)
 		for {
 			select {
 			case trace := <-writeTraceChan:
 				durations[currentIteration] = trace.Duration
 				currentIteration++
-				if currentIteration == *iterations {
+				if currentIteration == iterations {
 					doneChan <- durations
 					return
-				} else if currentIteration > *iterations {
+				} else if currentIteration > iterations {
 					// Should not happened
-					panic(fmt.Errorf("Current iteration %d is greater than target iteration number %d", currentIteration, *iterations))
+					panic(fmt.Errorf("Current iteration %d is greater than target iteration number %d", currentIteration, iterations))
 				}
+			case <-ticker:
+				fmt.Printf("\033[2K\rWrote %d of %d (~%.1f flows/sec)...",
+					currentIteration, iterations, float64(currentIteration-lastCount)/printInterval.Seconds())
+				lastCount = currentIteration
 			}
 		}
 	}()
 
 	// Send the flow entries
-	writeReples.Add(int(*iterations))
-	SendTableEntries(client, *iterations, *batchSize)
+	writeReples.Add(iterations)
+	SendTableEntries(client, iterations, batchSize)
 
 	// Wait for all writes to finish
 	durations := <-doneChan
-
 	writeReples.Wait()
 	fmt.Printf("Number of failed writes: %d\n", failedWrites)
 
-	fileName := fmt.Sprintf("test-result-%s-%d-%d-%d.csv", p4rt.TestTarget(), *batchSize, *iterations, time.Now().Unix())
+	// Writing to CSV file
+	fileName := fmt.Sprintf("test-result-%s-%d-%d-%d.csv", "Tofino", batchSize, iterations, time.Now().Unix())
 	fmt.Printf("Saving results to %s\n", fileName)
 
 	csvFile, err := os.Create(fileName)
@@ -99,67 +126,70 @@ func main() {
 	}
 	resultWriter := csv.NewWriter(csvFile)
 
+	resultWriter.Write([]string{"Index of durations", "µs/per write request"})
+	var summary int64
 	for i, d := range durations {
 		data := []string{strconv.Itoa(i), strconv.FormatInt(d.Microseconds(), 10)}
 		resultWriter.Write(data)
+		summary += d.Microseconds()
 	}
 	resultWriter.Flush()
+	fmt.Printf("\033[2K\r%f seconds, %d writes, %f writes request/sec\n",
+		float64(summary)/1000000, iterations, float64(int64(iterations)*1000000)/float64(summary))
 }
 
 // SendTableEntries writes multiple table entries to the routing_v4
 // table.
-func SendTableEntries(client p4rt.P4RuntimeClient, iterations int, batchSize int) {
+func SendTableEntries(client bfrt.BFRuntimeClient, iterations int, batchSize int) {
+
+	tableID, err := p4infoHelper.GetP4Id("pipe.SwitchIngress.rib_24")
+	if err != nil {
+		panic(err)
+	}
+
+	actionID, err := p4infoHelper.GetP4Id("SwitchIngress.hit_route_port")
+	if err != nil {
+		panic(err)
+	}
 
 	// Prepare write requests for all iterations
 	requests := make([]*p4.WriteRequest, iterations)
 	for i := 0; i < iterations; i++ {
-		tableID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.routing_v4")
-		if err != nil {
-			panic(err)
-		}
-
-		actionID, err := p4infoHelper.GetP4Id("FabricIngress.forwarding.set_next_id_routing_v4")
-		if err != nil {
-			panic(err)
-		}
-
 		updates := make([]*p4.Update, batchSize)
 		for j := 0; j < batchSize; j++ {
-			match := []*p4.FieldMatch{
-				{
-					FieldId: 1, // ipv4_dst
-					FieldMatchType: &p4.FieldMatch_Lpm{
-						&p4.FieldMatch_LPM{
-							Value:     Uint64(uint64(i*batchSize + j))[4:8],
-							PrefixLen: 32,
-						},
-					},
-				},
-			}
+			ipOri := int2ip(uint32((i*batchSize + j)))
+			ip := net.IPv4(ipOri[1], ipOri[2], ipOri[3], ipOri[0])
 
 			updates[j] = &p4.Update{
 				Type: p4.Update_INSERT,
 				Entity: &p4.Entity{Entity: &p4.Entity_TableEntry{
 					TableEntry: &p4.TableEntry{
 						TableId: tableID, // FabricIngress.forwarding.routing_v4
-						Match:   match,
-						Action: &p4.TableAction{Type: &p4.TableAction_Action{Action: &p4.Action{
-							ActionId: actionID, // set_next_id_routing_v4
-							Params: []*p4.Action_Param{
-								{
-									ParamId: 1,              // next_id
-									Value:   Uint64(1)[4:8], // 32 bits
-								},
+						Key: &p4.TableKey{
+							Fields: []*p4.KeyField{
+								util.GenKeyField(f.MATCH_EXACT,
+									1,
+									util.Ipv4ToBytes(ip.String())[0:3]),
 							},
-						}}},
+						},
+						Data: &p4.TableData{
+							ActionId: actionID,
+							Fields: []*p4.DataField{
+								util.GenDataField(1, util.Int16ToBytes(128)),
+							},
+						},
 					},
-				}},
+				},
+				},
 			}
 		}
 		req := &p4.WriteRequest{
-			DeviceId:   client.DeviceID(),
-			ElectionId: client.ElectionID(),
-			Updates:    updates,
+			ClientId: client.ClientId(),
+			Target: &p4.TargetDevice{
+				DeviceId: client.DeviceID(),
+				PipeId:   0xffff,
+			},
+			Updates: updates,
 		}
 		requests[i] = req
 	}
@@ -182,8 +212,8 @@ func CountFailed(write *p4.WriteRequest, res <-chan []*p4.Error) {
 	writeReples.Done()
 }
 
-func Uint64(v uint64) []byte {
-	bytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(bytes, v)
-	return bytes
+func int2ip(nn uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, nn)
+	return ip
 }

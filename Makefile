@@ -1,20 +1,9 @@
-.PHONY: check_env_ build
+.PHONY: build
 
-all: bmv2 stratum_bf stratum_bfrt
+all: tofino
 
-check_env_:
-ifndef TARGET
-	$(error TARGET undefined)
-endif
+tofino:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bfrt_test_tofino ./bin/main.go
 
-build: check_env_
-	go build -tags "$(TARGET)" -o p4rt_test_$(TARGET) ./bin/main.go
 
-bmv2:
-	TARGET="bmv2" $(MAKE) build
 
-stratum_bf:
-	TARGET="stratum_bf" $(MAKE) build
-
-stratum_bfrt:
-	TARGET="stratum_bfrt" $(MAKE) build
