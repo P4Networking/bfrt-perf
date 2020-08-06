@@ -10,7 +10,7 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
-	"github.com/breezestars/go-bfrt/util"
+	"github.com/P4Networking/pisc/util"
 	"net"
 	"os"
 	"strconv"
@@ -18,9 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/breezestars/bfrt-perf/bfrt"
-	"github.com/breezestars/bfruntime/go/p4"
-	f "github.com/breezestars/go-bfrt/util/enums"
+	"github.com/P4Networking/bfrt-perf/bfrt"
+	f "github.com/P4Networking/pisc/util/enums"
+	"github.com/P4Networking/proto/go/p4"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/codes"
 )

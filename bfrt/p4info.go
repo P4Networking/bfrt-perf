@@ -8,7 +8,7 @@ package bfrt
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/breezestars/go-bfrt/util"
+	"github.com/P4Networking/pisc/util"
 )
 
 type P4InfoHelper struct {

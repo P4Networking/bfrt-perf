@@ -25,7 +25,7 @@ Then, you can run the test:
  -p4Name tna_simple_router
 ```
 
-<img src="https://github.com/breezestars/bfrt-perf/raw/master/test_tofino.gif" width="688px" height="342px" />
+<img src="https://github.com/P4Networking/bfrt-perf/raw/master/test_tofino.gif" width="688px" height="342px" />
 
 Notes:
 - Remember to update the target string to match the IP of your switch

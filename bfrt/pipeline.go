@@ -7,7 +7,7 @@ package bfrt
 
 import (
 	"context"
-	"github.com/breezestars/bfruntime/go/p4"
+	"github.com/P4Networking/proto/go/p4"
 	"github.com/pkg/errors"
 )
 
